@@ -4,27 +4,33 @@ import numpy as np
 def _is_tensor(x):
     return isinstance(x, torch.Tensor)
 
-def to_srgb(x):
+def linear_to_srgb(x):
     """
-    Converts Linear to sRGB.
+    Converts Linear to sRGB using the official piecewise sRGB transfer function.
     Supports both Numpy arrays and PyTorch tensors.
     """
-    gamma = 1.0 / 2.2
     if _is_tensor(x):
-        return torch.pow(x.clamp(min=0.0), gamma)
+        x = x.clamp(min=0.0)
+        mask = x <= 0.0031308
+        return torch.where(mask, x * 12.92, 1.055 * torch.pow(x, 1.0/2.4) - 0.055)
     else:
-        return np.power(np.clip(x, 0.0, None), gamma)
+        x = np.clip(x, 0.0, None)
+        mask = x <= 0.0031308
+        return np.where(mask, x * 12.92, 1.055 * np.power(x, 1.0/2.4) - 0.055)
 
-def to_linear(x):
+def srgb_to_linear(x):
     """
-    Converts sRGB to Linear.
+    Converts sRGB to Linear using the official piecewise sRGB transfer function.
     Supports both Numpy arrays and PyTorch tensors.
     """
-    gamma = 2.2
     if _is_tensor(x):
-        return torch.pow(x.clamp(min=0.0), gamma)
+        x = x.clamp(min=0.0)
+        mask = x <= 0.04045
+        return torch.where(mask, x / 12.92, torch.pow((x + 0.055) / 1.055, 2.4))
     else:
-        return np.power(np.clip(x, 0.0, None), gamma)
+        x = np.clip(x, 0.0, None)
+        mask = x <= 0.04045
+        return np.where(mask, x / 12.92, np.power((x + 0.055) / 1.055, 2.4))
 
 def premultiply(fg, alpha):
     """

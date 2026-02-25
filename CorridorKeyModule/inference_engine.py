@@ -171,31 +171,29 @@ class CorridorKeyEngine:
         # res_fg is sRGB.
         fg_despilled = cu.despill(res_fg, green_limit_mode='average', strength=despill_strength)
         
-        # C. Premultiply
-        # FG * Alpha
-        fg_premul = cu.premultiply(fg_despilled, processed_alpha)
+        # C. Premultiply (for EXR Output)
+        # CONVERT TO LINEAR FIRST! EXRs must house linear color premultiplied by linear alpha.
+        fg_despilled_lin = cu.srgb_to_linear(fg_despilled)
+        fg_premul_lin = cu.premultiply(fg_despilled_lin, processed_alpha)
         
         # D. Pack RGBA
-        # [H, W, 4]
-        processed_rgba = np.concatenate([fg_premul, processed_alpha], axis=-1)
+        # [H, W, 4] - All channels are now strictly Linear Float
+        processed_rgba = np.concatenate([fg_premul_lin, processed_alpha], axis=-1)
 
         # ----------------------------
         
         # 7. Composite (on Checkerboard) for checking
-        # Convert Despilled FG to Linear to composite correctly
-        fg_lin = cu.to_linear(fg_despilled)
-        
         # Generate Dark/Light Gray Checkerboard (in sRGB, convert to Linear)
         bg_srgb = cu.create_checkerboard(w, h, checker_size=128, color1=0.15, color2=0.55)
-        bg_lin = cu.to_linear(bg_srgb)
+        bg_lin = cu.srgb_to_linear(bg_srgb)
         
         if fg_is_straight:
-             comp_lin = cu.composite_straight(fg_lin, bg_lin, processed_alpha) 
+             comp_lin = cu.composite_straight(fg_despilled_lin, bg_lin, processed_alpha) 
         else:
-             # If premultiplied, we don't multiply by alpha again
-             comp_lin = cu.composite_premul(fg_lin, bg_lin, processed_alpha)
+             # If premultiplied model, we shouldn't multiply again (though our pipeline forces straight)
+             comp_lin = cu.composite_premul(fg_despilled_lin, bg_lin, processed_alpha)
              
-        comp_srgb = cu.to_srgb(comp_lin)
+        comp_srgb = cu.linear_to_srgb(comp_lin)
         
         return {
             'alpha': res_alpha,        # Linear, Raw Prediction

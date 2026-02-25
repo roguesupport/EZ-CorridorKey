@@ -28,7 +28,7 @@ def test_despill(exr_path, output_dir):
     img_linear_rgb = cv2.cvtColor(img_linear, cv2.COLOR_BGR2RGB)
     
     # In the engine, it processes as sRGB for the despill step.
-    img_srgb = cu.to_srgb(np.maximum(img_linear_rgb, 0.0))
+    img_srgb = cu.linear_to_srgb(np.maximum(img_linear_rgb, 0.0))
     
     os.makedirs(output_dir, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(exr_path))[0]
